@@ -1,4 +1,4 @@
-package io.akkacf
+package io.beehive
 
 import scala.concurrent.Future
 
