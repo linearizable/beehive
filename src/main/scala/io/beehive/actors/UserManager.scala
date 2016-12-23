@@ -1,6 +1,7 @@
 package io.beehive.actors
 
-import akka.actor.Actor
+import akka.actor._
+import akka.persistence._
 import akka.actor.Props
 import io.beehive.lib.Akka
 
@@ -12,29 +13,52 @@ object UserManager {
     
     case object GetNumUsers
     case class NumUsers(num: Int)
+    
+    sealed trait UserManagerEvent
+    case class UserAdded(userId: String) extends UserManagerEvent
 }
 
-class UserManager extends Actor {
+class UserManager extends PersistentActor with ActorLogging {
     
     import UserActor._
     import UserManager._
     
+    def persistenceId = self.path.name
+    
     /**
      * Set of users
      */ 
-    val users = scala.collection.mutable.Set[Int]()
+    val users = scala.collection.mutable.Set[String]()
     
-    def receive = {
+    val receiveRecover: Receive = {
+        case event: UserManagerEvent => {
+            println(event)
+            updateState(event)
+        }
+        case RecoveryCompleted =>  {
+            log.info("UserManager recovery completed")
+            /**
+             * Recover all child user actors
+             */ 
+            users.foreach(userActor(_))
+        }
+    }
+    
+    /**
+     * Update state in response to events
+     */ 
+    val updateState: UserManagerEvent => Unit = {
+        case UserAdded(userId: String) => users += userId
+    }
+    
+    val receiveCommand: Receive = {
         case m @ UserItemInteraction(userId, itemId) =>
             /**
              * Send interaction to child user actor
              */
              userActor(userId) forward m
              
-             /**
-              * Add user to users set
-              */ 
-             users += userId
+             persist(UserAdded(userId))(updateState)
              
         case GetNumUsers =>
             sender() ! NumUsers(users.size)
@@ -43,7 +67,7 @@ class UserManager extends Actor {
     /**
      * Get ActorRef for child user actor
      */     
-    def userActor(userId: Int) = {
+    def userActor(userId: String) = {
         context.child(userActorName(userId)).getOrElse {
             context.actorOf(UserActor.props(userId), userActorName(userId))
         }
@@ -52,5 +76,5 @@ class UserManager extends Actor {
     /**
      * Get name for the user actor based on user id
      */
-    def userActorName(userId: Int) = "User:"+userId.toString()
+    def userActorName(userId: String) = "User:"+userId
 }

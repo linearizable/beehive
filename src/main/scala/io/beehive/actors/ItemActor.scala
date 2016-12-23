@@ -1,7 +1,7 @@
 package io.beehive.actors
 
-import akka.actor.Actor
-import akka.actor.Props
+import akka.actor._
+import akka.persistence._
 
 import akka.pattern.ask
 import akka.util.Timeout
@@ -13,53 +13,53 @@ import scala.collection.immutable.ListMap
 import io.beehive.lib._
 
 object ItemActor {
-    def props(itemId: Int) = Props(new ItemActor(itemId))
+    def props(itemId: String) = Props(new ItemActor(itemId))
     
     /**
      * Message when a user interacts with an item
      */ 
-    case class ItemInteraction(itemId: Int) 
+    case class ItemInteraction(itemId: String) 
     
     /** 
      * Add an item to similar items list
      */ 
-    case class AddSimilarItem(itemToAddTo: Int, itemToBeAdded: Int)
-    
-    /**
-     * Message to update total occurrences of a similar item
-     */ 
-    case class UpdateSimilarItemOccurrences(targetItem: Int, itemToBeUpdated: Int, occurrences: Int)
+    case class AddSimilarItem(itemToAddTo: String, itemToBeAdded: String)
     
     /**
      * Messages to fetch similar items using different similairty metrics
      */ 
-    case class GetCooccurrenceSimilarItems(itemId: Int, numItems: Int)
-    case class GetJaccardSimilarItems(itemId: Int, numItems: Int)
-    case class GetCosineSimilarItems(itemId: Int, numItems: Int)
-    case class GetLLRSimilarItems(itemId: Int, numItems: Int)
+    case class GetCooccurrenceSimilarItems(itemId: String, numItems: Int)
+    case class GetJaccardSimilarItems(itemId: String, numItems: Int)
+    case class GetCosineSimilarItems(itemId: String, numItems: Int)
+    case class GetLLRSimilarItems(itemId: String, numItems: Int)
     
     /**
      * Output of the similarity calculation
      * Key: Similar Item Id
      * Value: Similarity score (based on similarity metric chosen)
      */ 
-    case class SimilarResult(itemId: Int, score: Double) 
+    case class SimilarResult(itemId: String, score: Double) 
     case class SimilarResults(results: List[SimilarResult])
     
     object SimilarResult {
         /**
          * Construnctors for SimilarResult which takes a tuple
          */ 
-        //def apply(t: (Int, Int)) : SimilarResult = SimilarResult(t._1, t._2.toDouble)
-        def apply(t: (Int, Double)) : SimilarResult = SimilarResult(t._1, t._2)
+        def apply(t: (String, Double)) : SimilarResult = SimilarResult(t._1, t._2)
     }
+    
+    sealed trait ItemEvent
+    case object ItemOccurred extends ItemEvent
+    case class SimilarItemAdded(itemAdded: String) extends ItemEvent
 }
 
-class ItemActor(itemId:Int) extends Actor {
+class ItemActor(itemId: String) extends PersistentActor with ActorLogging {
     
     import ItemActor._
     import UserManager._
     import ItemManager._
+    
+    def persistenceId = self.path.name
     
     var occurrences = 0
     /**
@@ -67,42 +67,63 @@ class ItemActor(itemId:Int) extends Actor {
      * Key = ID of the similar item
      * Value = No. of occurrences together
      */ 
-    var similarItems = scala.collection.mutable.Map[Int, Int]()
+    var similarItems = scala.collection.mutable.Map[String, Int]()
 
     /**
      * UserManager actor to send user related messages
      */ 
     val userManager = UserManager.userManager
     
-    def receive = {
-        
-        /**
-         * A user interacted with me
-         */ 
-        case ItemInteraction(_) => 
+    val receiveRecover: Receive = {
+        case event: ItemEvent => {
+            println(event)
+            updateState(event)
+        }
+        case RecoveryCompleted =>  {
+            log.info(s"Item $itemId recovery completed")
+        }
+    }
+    
+    /**
+     * Update state in response to events
+     */ 
+    val updateState: ItemEvent => Unit = {
+        case ItemOccurred => {
             /**
              * Increment my total occurrences
              */
-            occurrences += 1     
-    
-        /**
-         * Add or update itemToBeAdded in my similarItems list
-         */     
-        case AddSimilarItem(_, itemToBeAdded) =>
-            
-            similarItems.get(itemToBeAdded) match {
+            occurrences += 1
+        }
+        case SimilarItemAdded(itemAdded: String) => {
+            similarItems.get(itemAdded) match {
                 case Some(n) => 
                     /**
                      *  Item already exists in the list, increment occurrences together
                      */ 
-                    similarItems(itemToBeAdded) += 1
+                    similarItems(itemAdded) += 1
                 case None =>
                     /**
                      * Item does not already exist in the list.
                      * Add item and set 1 as occurrences together
                      */ 
-                    similarItems += (itemToBeAdded -> 1)
+                    similarItems += (itemAdded -> 1)
             }
+        }
+    }
+    
+    val receiveCommand: Receive = {
+        
+        /**
+         * A user interacted with me
+         */ 
+        case ItemInteraction(_) => 
+            persist(ItemOccurred)(updateState)
+    
+        /**
+         * Add or update itemToBeAdded in my similarItems list
+         */     
+        case AddSimilarItem(_, itemToBeAdded) =>
+            persist(SimilarItemAdded(itemToBeAdded))(updateState)
         
         /**
          * Get similar items using cooccurrence similarity

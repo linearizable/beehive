@@ -53,5 +53,5 @@ trait BeehiveApi {
     
     def loadData() = Future { Beehive.loadData }
     
-    def getSimilarResults(itemId: String, algo: String) = Beehive.getSimilarResults(itemId.toInt, algo)
+    def getSimilarResults(itemId: String, algo: String) = Beehive.getSimilarResults(itemId, algo)
 }

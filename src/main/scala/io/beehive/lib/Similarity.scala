@@ -7,7 +7,7 @@ trait Similarity {
     def similarity : List[SimilarResult]
 }
 
-class Cooccurrence(similarItems: Map[Int, Int], 
+class Cooccurrence(similarItems: Map[String, Int], 
                    numItems: Int) extends Similarity {
     def similarity() = {
         /**
@@ -18,9 +18,9 @@ class Cooccurrence(similarItems: Map[Int, Int],
     }
 }
 
-class Jaccard(similarItems: Map[Int, Int], 
+class Jaccard(similarItems: Map[String, Int], 
               occurrences: Int, 
-              similarItemOccurrences: Map[Int, Int], 
+              similarItemOccurrences: Map[String, Int], 
               numItems: Int) extends Similarity {
     def similarity() = {
         /**
@@ -40,14 +40,14 @@ class Jaccard(similarItems: Map[Int, Int],
      * Compute jaccard score
      * = A intersection B / A union B
      */ 
-    def computeScore(itemId: Int, occurrencesTogether: Int) = {
+    def computeScore(itemId: String, occurrencesTogether: Int) = {
         occurrencesTogether.toDouble/(occurrences+similarItemOccurrences(itemId)-occurrencesTogether)
     }
 }
 
-class Cosine(similarItems: Map[Int, Int], 
+class Cosine(similarItems: Map[String, Int], 
              occurrences: Int, 
-             similarItemOccurrences: Map[Int, Int], 
+             similarItemOccurrences: Map[String, Int], 
              numItems: Int) extends Similarity {
     def similarity() = {
         /**
@@ -66,14 +66,14 @@ class Cosine(similarItems: Map[Int, Int],
     /**
      * Compute cosine score
      */ 
-    def computeScore(itemId: Int, occurrencesTogether: Int) = {
+    def computeScore(itemId: String, occurrencesTogether: Int) = {
         occurrencesTogether.toDouble/(math.sqrt(occurrences) * math.sqrt(similarItemOccurrences(itemId)))
     }
 }
 
-class LogLikelihood(similarItems: Map[Int, Int], 
+class LogLikelihood(similarItems: Map[String, Int], 
                     occurrences: Int, 
-                    similarItemOccurrences: Map[Int, Int], 
+                    similarItemOccurrences: Map[String, Int], 
                     numUsers: Int,
                     numItems: Int) extends Similarity {
     def similarity() = {
@@ -96,7 +96,7 @@ class LogLikelihood(similarItems: Map[Int, Int],
      * item2 -> Against which we are computing score
      * e.g. we are computing LL score for (item1 -> item2)
      */ 
-    def computeScore(itemId: Int, occurrencesTogether: Int) = {
+    def computeScore(itemId: String, occurrencesTogether: Int) = {
         val item2 = itemId
         
         /**

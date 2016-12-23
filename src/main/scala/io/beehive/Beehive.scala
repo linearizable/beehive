@@ -10,20 +10,20 @@ import akka.pattern.ask
 import akka.util.Timeout
 
 object Beehive {
-    
+     
     def loadData() = {
         val userManager = UserManager.userManager
         val itemManager = ItemManager.itemManager
         
-        val lines = scala.io.Source.fromFile("/tmp/s.csv").getLines
+        //val lines = scala.io.Source.fromFile("/tmp/s.csv").getLines
         
-        lines.foreach(l => {
-            l.split(",") match {
-                case Array(userId, itemId) =>
-                    userManager ! UserItemInteraction(userId.toInt, itemId.toInt)
-                    itemManager ! ItemInteraction(itemId.toInt)
-            }
-        })
+        //lines.foreach(l => {
+            //l.split(",") match {
+                //case Array(userId, itemId) =>
+                    //userManager ! UserItemInteraction(userId, itemId)
+                    //itemManager ! ItemInteraction(itemId)
+            //}
+        //})
         
         //Thread.sleep(3000)
         //implicit val timeout = Timeout(5 seconds)
@@ -37,7 +37,7 @@ object Beehive {
         //Akka.actorSystem.shutdown
     }
     
-    def getSimilarResults(itemId: Int, algo: String) = {
+    def getSimilarResults(itemId: String, algo: String) = {
         implicit val timeout = Timeout(5 seconds)
         algo match {
             case "cooccurrence" => ItemManager.itemManager.ask(GetCooccurrenceSimilarItems(itemId, 3)).mapTo[SimilarResults]
